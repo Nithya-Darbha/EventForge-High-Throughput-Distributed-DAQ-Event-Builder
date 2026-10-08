@@ -4,6 +4,7 @@
 #include <thread>
 
 #include "daq/clock.hpp"
+#include "daq/futex.hpp"
 
 namespace daq {
 
@@ -18,8 +19,19 @@ ShardInbox::ShardInbox(bool spsc, size_t cap) {
     }
 }
 
+/*
+spsc: push, bump pushSeq, if the shard is asleep wake it
+the fence pairs with the one in popFor (Dekker: we store then load, it stores then loads)
+*/
 bool ShardInbox::tryPush(Fragment&& f) {
-    return ring ? ring->tryPush(std::move(f)) : q->tryPush(std::move(f));
+    if(q) return q->tryPush(std::move(f));
+    if(!ring->tryPush(std::move(f))) return false;
+    pushSeq.fetch_add(1,std::memory_order_relaxed);
+    std::atomic_thread_fence(std::memory_order_seq_cst);
+    if(sleeping.load(std::memory_order_relaxed)){
+        futexWake(&pushSeq);
+    }
+    return true;
 }
 
 bool ShardInbox::tryPop(Fragment& f) {
@@ -28,29 +40,47 @@ bool ShardInbox::tryPop(Fragment& f) {
 
 /*
 mutex queue -> just wait on its condvar
-spsc ring   -> has no condvar: spin a bit (frags usually come in bursts)
-               then sleep with backoff till the timeout
+spsc ring   -> spin a bit first (frags usually come in bursts)
+               then: say we're sleeping, check once more, sleep on the futex till a push
+v1 slept with a 10..160us backoff instead. worked on linux, but in a mac VM every short
+sleep took ~2.5ms -> p50 latency 5ms. a futex wakeup is an event, not a timer
 */
 bool ShardInbox::popFor(Fragment& f, uint64_t timeoutNs) {
     if(q) return q->popFor(f,timeoutNs);
     for(int i=0;i<64;i++){
         if(ring->tryPop(f)) return true;
+        cpuRelax();
     }
     uint64_t deadline=nowNs()+timeoutNs;
-    uint64_t nap=10'000;
-    while(nowNs()<deadline){
+    while(true){
+        uint32_t seen=pushSeq.load(std::memory_order_relaxed);
+        sleeping.store(1,std::memory_order_relaxed);
+        std::atomic_thread_fence(std::memory_order_seq_cst);
+        bool got=ring->tryPop(f);
+        if(got || closed.load(std::memory_order_acquire)){
+            sleeping.store(0,std::memory_order_relaxed);
+            return got || ring->tryPop(f);
+        }
+        uint64_t now=nowNs();
+        if(now>=deadline){
+            sleeping.store(0,std::memory_order_relaxed);
+            return false;
+        }
+        futexWait(&pushSeq,seen,deadline-now);
+        sleeping.store(0,std::memory_order_relaxed);
         if(ring->tryPop(f)) return true;
-        if(closed.load(std::memory_order_acquire)) return ring->tryPop(f);
-        sleepNs(nap);
-        //back off when its quiet: 10us, 20, 40 ... max 160us (was a flat 20us = lots of cpu doing nothing)
-        if(nap<160'000) nap*=2;
     }
-    return ring->tryPop(f);
 }
 
 void ShardInbox::close() {
     closed.store(true,std::memory_order_release);
-    if(q) q->close();
+    if(q){
+        q->close();
+    }
+    else{
+        pushSeq.fetch_add(1,std::memory_order_seq_cst);
+        futexWake(&pushSeq);
+    }
 }
 
 bool ShardInbox::closedAndEmpty() const {

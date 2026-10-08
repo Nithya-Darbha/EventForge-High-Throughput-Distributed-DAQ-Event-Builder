@@ -1,0 +1,47 @@
+{
+  "name": "credits",
+  "runs": [
+    {
+      "label": "credits=16",
+      "params": {
+        "builder.credits": 16
+      },
+      "dir": "credits=16"
+    },
+    {
+      "label": "credits=32",
+      "params": {
+        "builder.credits": 32
+      },
+      "dir": "credits=32"
+    },
+    {
+      "label": "credits=64",
+      "params": {
+        "builder.credits": 64
+      },
+      "dir": "credits=64"
+    },
+    {
+      "label": "credits=128",
+      "params": {
+        "builder.credits": 128
+      },
+      "dir": "credits=128"
+    },
+    {
+      "label": "credits=256",
+      "params": {
+        "builder.credits": 256
+      },
+      "dir": "credits=256"
+    },
+    {
+      "label": "credits=512",
+      "params": {
+        "builder.credits": 512
+      },
+      "dir": "credits=512"
+    }
+  ]
+}

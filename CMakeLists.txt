@@ -32,6 +32,7 @@ find_package(Threads REQUIRED)
 
 # shared helpers
 add_library(daq_common STATIC
+  src/common/clock.cpp
   src/common/crc32c.cpp
   src/common/histogram.cpp
   src/common/metrics.cpp

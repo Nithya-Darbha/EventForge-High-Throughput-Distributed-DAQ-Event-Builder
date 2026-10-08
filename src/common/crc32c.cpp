@@ -6,6 +6,11 @@
 #if defined(__x86_64__)
 #include <nmmintrin.h>
 #endif
+#if defined(__aarch64__)
+#include <arm_acle.h>
+#include <asm/hwcap.h>
+#include <sys/auxv.h>
+#endif
 
 namespace daq {
 namespace {
@@ -54,6 +59,31 @@ bool haveSse42() {
 }
 #endif
 
+#if defined(__aarch64__)
+//same idea as the sse4.2 one, ARM has crc32c instructions too (crc32cx = 8 bytes)
+//first version only had the x86 path -> on an M1 everything fell back to the table, ~10x slower
+__attribute__((target("+crc"))) uint32_t crc32cArm(const void* data, size_t len, uint32_t crc) {
+    auto p=static_cast<const unsigned char*>(data);
+    uint32_t c=~crc;
+    while(len>=8){
+        uint64_t w;
+        std::memcpy(&w,p,8);
+        c=__crc32cd(c,w);
+        p+=8;
+        len-=8;
+    }
+    while(len--){
+        c=__crc32cb(c,*p++);
+    }
+    return ~c;
+}
+
+bool haveArmCrc() {
+    static const bool v=(getauxval(AT_HWCAP)&HWCAP_CRC32)!=0;
+    return v;
+}
+#endif
+
 } // namespace
 
 uint32_t crc32cSw(const void* data, size_t len, uint32_t crc) {
@@ -69,7 +99,20 @@ uint32_t crc32c(const void* data, size_t len, uint32_t crc) {
 #if defined(__x86_64__)
     if(haveSse42()) return crc32cHw(data,len,crc);
 #endif
+#if defined(__aarch64__)
+    if(haveArmCrc()) return crc32cArm(data,len,crc);
+#endif
     return crc32cSw(data,len,crc);
+}
+
+const char* crc32cImpl() {
+#if defined(__x86_64__)
+    if(haveSse42()) return "sse4.2";
+#endif
+#if defined(__aarch64__)
+    if(haveArmCrc()) return "armv8-crc";
+#endif
+    return "software";
 }
 
 } // namespace daq

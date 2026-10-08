@@ -1,0 +1,101 @@
+{
+  "name": "overload",
+  "runs": [
+    {
+      "label": "policy=block_rate=5000",
+      "params": {
+        "frontend.policy": "block",
+        "builder.rate": 5000
+      },
+      "dir": "policy=block_rate=5000"
+    },
+    {
+      "label": "policy=block_rate=10000",
+      "params": {
+        "frontend.policy": "block",
+        "builder.rate": 10000
+      },
+      "dir": "policy=block_rate=10000"
+    },
+    {
+      "label": "policy=block_rate=15000",
+      "params": {
+        "frontend.policy": "block",
+        "builder.rate": 15000
+      },
+      "dir": "policy=block_rate=15000"
+    },
+    {
+      "label": "policy=block_rate=20000",
+      "params": {
+        "frontend.policy": "block",
+        "builder.rate": 20000
+      },
+      "dir": "policy=block_rate=20000"
+    },
+    {
+      "label": "policy=block_rate=30000",
+      "params": {
+        "frontend.policy": "block",
+        "builder.rate": 30000
+      },
+      "dir": "policy=block_rate=30000"
+    },
+    {
+      "label": "policy=block_rate=40000",
+      "params": {
+        "frontend.policy": "block",
+        "builder.rate": 40000
+      },
+      "dir": "policy=block_rate=40000"
+    },
+    {
+      "label": "policy=drop_rate=5000",
+      "params": {
+        "frontend.policy": "drop",
+        "builder.rate": 5000
+      },
+      "dir": "policy=drop_rate=5000"
+    },
+    {
+      "label": "policy=drop_rate=10000",
+      "params": {
+        "frontend.policy": "drop",
+        "builder.rate": 10000
+      },
+      "dir": "policy=drop_rate=10000"
+    },
+    {
+      "label": "policy=drop_rate=15000",
+      "params": {
+        "frontend.policy": "drop",
+        "builder.rate": 15000
+      },
+      "dir": "policy=drop_rate=15000"
+    },
+    {
+      "label": "policy=drop_rate=20000",
+      "params": {
+        "frontend.policy": "drop",
+        "builder.rate": 20000
+      },
+      "dir": "policy=drop_rate=20000"
+    },
+    {
+      "label": "policy=drop_rate=30000",
+      "params": {
+        "frontend.policy": "drop",
+        "builder.rate": 30000
+      },
+      "dir": "policy=drop_rate=30000"
+    },
+    {
+      "label": "policy=drop_rate=40000",
+      "params": {
+        "frontend.policy": "drop",
+        "builder.rate": 40000
+      },
+      "dir": "policy=drop_rate=40000"
+    }
+  ]
+}

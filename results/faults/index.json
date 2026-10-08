@@ -1,0 +1,10 @@
+{
+  "name": "faults",
+  "runs": [
+    {
+      "label": "default",
+      "params": {},
+      "dir": "default"
+    }
+  ]
+}

@@ -54,7 +54,7 @@ void SinkPool::run(Worker& w, uint32_t idx) {
     Event ev;
     while(done.pop(ev)){
         uint64_t delay=delayFor(nowNs());
-        if(delay) sleepNs(delay);
+        if(delay) preciseSleep(delay);
 
         if(cfg.verify){
             for(const auto& f:ev.frags){

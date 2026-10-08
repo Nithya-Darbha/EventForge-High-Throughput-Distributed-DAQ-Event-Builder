@@ -1,0 +1,31 @@
+{
+  "name": "faults",
+  "builder": {
+    "sources": 4,
+    "rate": 5000,
+    "duration_s": 4,
+    "verify": true
+  },
+  "frontend": {
+    "payload_min": 4096,
+    "payload_max": 4096
+  },
+  "frontends": {
+    "0": {
+      "loss": 0.005,
+      "seed": 1
+    },
+    "1": {
+      "dup": 0.005,
+      "seed": 2
+    },
+    "2": {
+      "reorder": 0.005,
+      "seed": 3
+    },
+    "3": {
+      "corrupt": 0.002,
+      "seed": 4
+    }
+  }
+}

@@ -73,7 +73,7 @@ void TriggerGen::run() {
     nameThread("eb-trigger");
     tightTimerSlack();
     const uint64_t start=t0.load(std::memory_order_acquire);
-    sleepUntilNs(start);
+    preciseSleepUntil(start);
     ttc.setRunState(RunState::RUNNING);
 
     TtcShared* shm=ttc.shm();
@@ -99,7 +99,7 @@ void TriggerGen::run() {
         if(published) ttc.wakeAll();
 
         uint64_t wakeAt=std::max(static_cast<uint64_t>(next),now+batchNs);
-        sleepUntilNs(wakeAt);
+        preciseSleepUntil(wakeAt);  //plain nanosleep can be ms late in a VM, see clock.hpp
     }
 
     ttc.setRunState(RunState::STOPPED);

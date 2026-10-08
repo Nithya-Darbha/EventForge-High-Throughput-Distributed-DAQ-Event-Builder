@@ -28,8 +28,10 @@ take more data raises BUSY and the trigger stops for everyone, so all sources st
 events. Here: the TTC is shared memory, BUSY is one bit per source in an atomic `uint64_t`, the
 generator vetoes triggers while any bit is set. Deadtime = vetoed / offered.
 
-The DROP results show why this matters: without coordination, throughput collapses and stays
-collapsed after a burst (metastable failure). That was not something I expected to be that strong.
+The DROP results show why this matters: without coordination, goodput collapses during overload
+(96 to 99% of triggers never become a complete event). In the first version it even stayed collapsed
+after a burst ended, but part of that was my slow credit return (see the VM section below), after
+fixing that it recovers once the load drops.
 
 Possible fix for DROP if I ever want it: make drops coordinated (drop whole events, decided centrally
 or by a deterministic rule on `eventId`), or evict partial events early when the pool is under
@@ -50,10 +52,10 @@ and the shard the only consumer, which is why an SPSC ring fits.
 ## SPSC ring vs mutex queue
 
 The ring: head and tail on separate cache lines, each side caches the other index and only reloads it
-when the ring looks full/empty, acquire/release only. Result: no real difference at these rates. The
-queue isn't the bottleneck, and because the ring has no condvar the consumer polls with a backoff
-(10 to 160 µs), which costs some latency at low rates. I kept both behind `--queue` and wrote that up
-instead of pretending it was faster.
+when the ring looks full/empty, acquire/release only. When empty the consumer sleeps on a futex and
+the producer only makes a syscall if it is actually asleep. Result: no big difference at these rates,
+the queue isn't the bottleneck (the receiver thread is: syscalls, memcpy, CRC). I kept both behind
+`--queue` and wrote that up instead of pretending lock free automatically wins.
 
 ## Buffer pool
 
@@ -86,6 +88,35 @@ histogram (32 sub-buckets per power of two, under 3.2% error), one per sink thre
 
 Linux adds up to 50 µs of slack to every sleep by default. The trigger generator and sinks set
 `PR_SET_TIMERSLACK` to 1 ns, otherwise every 10 µs sleep would be a 60 µs sleep.
+
+## Running it in a VM (OrbStack / Docker on a Mac): what broke and why
+
+First run on an M-series Mac inside OrbStack: everything *correct* (all events built, fault
+accounting exact) but p50 latency 5 ms instead of ~0.2 ms, and any scenario with a sink delay
+built ~800 events/s instead of ~14k. Two separate causes:
+
+1. **Short sleeps are slow in that VM.** A 100 µs `clock_nanosleep` took ~2.5 ms (2 sinks /
+   800 events/s = 2.5 ms per "100 µs" sleep). The trigger thread was oversleeping too (it used
+   0.05 s of CPU vs 1.0 s on bare Linux). Anything paced by a timer was off by 25x.
+   Fixes:
+   - `calibrateSpin()` at builder start measures how late a 50 µs sleep wakes up (p90) and
+     `preciseSleepUntil()` sleeps most of the way then spins the rest. On bare Linux it spins
+     ~30 µs, in the VM ~3-4 ms (= the trigger thread basically owns a core, which is what a
+     real trigger board is anyway). Printed at startup and in the summary.
+   - the SPSC shard inbox no longer polls with sleeps, the consumer sleeps on a futex and the
+     receiver wakes it (eventcount pattern: `pushSeq` + `sleeping` flag + a fence each side).
+     Wakeup is an event, not a timer, so it doesn't care about timer resolution.
+   - credit return: sinks poke the receiver through an `eventfd` exactly once per credit batch,
+     instead of the receiver noticing on its 1 ms epoll timeout. Also helped on bare Linux:
+     baseline p50 188 -> 78 µs, overload capacity 14.1k -> 15.4k events/s.
+2. **CRC32C was software on ARM.** I only wrote the SSE4.2 path. ARMv8 has `crc32cx` too
+   (`__crc32cd`, checked at runtime with `getauxval(AT_HWCAP) & HWCAP_CRC32`). The receiver was
+   CRC bound at 24k events/s. Tested by cross compiling with `aarch64-linux-gnu-g++` and running
+   the tests + a full run under `qemu-aarch64`.
+
+Also found while doing this: the TTC futex handshake used release/acquire on a store->load pair
+(Dekker). Fine on x86 (locked RMW = full barrier), not guaranteed on ARM -> occasional missed
+wakeup, caught by the 2 ms futex timeout. Now seq_cst fences on both sides.
 
 ## Things I'd do next
 

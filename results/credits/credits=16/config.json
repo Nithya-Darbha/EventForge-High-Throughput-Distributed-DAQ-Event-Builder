@@ -1,0 +1,26 @@
+{
+  "name": "credits",
+  "builder": {
+    "sources": 4,
+    "rate": 30000,
+    "duration_s": 3,
+    "sinks": 2,
+    "sink_delay_us": 100,
+    "credits": 16
+  },
+  "frontend": {
+    "payload_min": 4096,
+    "payload_max": 4096,
+    "policy": "block"
+  },
+  "sweep": {
+    "builder.credits": [
+      16,
+      32,
+      64,
+      128,
+      256,
+      512
+    ]
+  }
+}

@@ -175,3 +175,82 @@ TEST(BufferPool, SlotsDontOverlap) {
     uint32_t b=p.acquire();
     EXPECT_EQ(p.data(b)-p.data(a),64*(static_cast<long>(b)-static_cast<long>(a)));
 }
+
+//---------- ShardInbox (spsc + futex wakeup) ----------
+
+#include "builder/builder.hpp"
+#include "daq/clock.hpp"
+
+//consumer goes to sleep on the futex, a push from another thread has to wake it up fast
+//(v1 slept in 10..160us steps instead, which turned into ms in a mac VM)
+TEST(ShardInbox, SpscSleepingConsumerGetsWoken) {
+    ShardInbox in(true,64);
+    std::atomic<uint64_t> gotAt{0};
+    std::thread cons([&]{
+        Fragment f;
+        bool got=in.popFor(f,2'000'000'000ull);
+        if(got && f.hdr.eventId==42) gotAt=nowNs();
+    });
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));  //let it fall asleep
+    uint64_t sent=nowNs();
+    Fragment f;
+    f.hdr.eventId=42;
+    ASSERT_TRUE(in.tryPush(std::move(f)));
+    cons.join();
+    ASSERT_NE(gotAt.load(),0u);
+    EXPECT_LT(gotAt.load()-sent,20'000'000u);  //woken by the push, not by the 2s timeout
+}
+
+TEST(ShardInbox, CloseWakesSleepingConsumer) {
+    for(bool spsc:{true,false}){
+        ShardInbox in(spsc,8);
+        std::thread cons([&]{
+            Fragment f;
+            EXPECT_FALSE(in.popFor(f,5'000'000'000ull));
+        });
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        uint64_t t=nowNs();
+        in.close();
+        cons.join();
+        EXPECT_LT(nowNs()-t,1'000'000'000u);
+        EXPECT_TRUE(in.closedAndEmpty());
+    }
+}
+
+//2 threads, 500k frags thru the inbox with the consumer sleeping whenever its empty
+TEST(ShardInbox, SpscNoLostWakeups) {
+    ShardInbox in(true,64);
+    const uint64_t n=500'000;
+    std::thread prod([&]{
+        for(uint64_t i=0;i<n;i++){
+            Fragment f;
+            f.hdr.eventId=i;
+            while(!in.tryPush(std::move(f))){
+                std::this_thread::yield();
+            }
+            if(i%1000==0) std::this_thread::sleep_for(std::chrono::microseconds(50));  //let it sleep sometimes
+        }
+    });
+    uint64_t expect=0;
+    Fragment f;
+    while(expect<n){
+        ASSERT_TRUE(in.popFor(f,2'000'000'000ull)) << "stuck at " << expect;
+        ASSERT_EQ(f.hdr.eventId,expect);
+        expect++;
+    }
+    prod.join();
+}
+
+//forced spin: precise sleep has to be accurate even if the plain sleep part is coarse
+TEST(PreciseSleep, HitsDeadline) {
+    uint64_t old=spinNs();
+    setSpinNs(200'000);
+    for(int i=0;i<20;i++){
+        uint64_t t=nowNs();
+        preciseSleep(100'000);
+        uint64_t took=nowNs()-t;
+        EXPECT_GE(took,100'000u);
+        EXPECT_LT(took,1'000'000u);
+    }
+    setSpinNs(old);
+}

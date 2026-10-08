@@ -1,14 +1,13 @@
 #include "daq/ttc.hpp"
 
+#include "daq/futex.hpp"
+
 #include <fcntl.h>
-#include <linux/futex.h>
 #include <sys/mman.h>
-#include <sys/syscall.h>
 #include <unistd.h>
 
 #include <cerrno>
 #include <chrono>
-#include <climits>
 #include <cstring>
 #include <new>
 #include <stdexcept>
@@ -16,16 +15,6 @@
 
 namespace daq {
 namespace {
-
-//plain (not _PRIVATE) futex ops so they work across processes on shared mem
-long futexWait(std::atomic<uint32_t>* addr, uint32_t expected, long timeoutNs) {
-    timespec ts{timeoutNs/1'000'000'000L,timeoutNs%1'000'000'000L};
-    return syscall(SYS_futex,reinterpret_cast<uint32_t*>(addr),FUTEX_WAIT,expected,&ts,nullptr,0);
-}
-
-long futexWake(std::atomic<uint32_t>* addr) {
-    return syscall(SYS_futex,reinterpret_cast<uint32_t*>(addr),FUTEX_WAKE,INT_MAX,nullptr,nullptr,0);
-}
 
 std::runtime_error sysError(const std::string& what) {
     return std::runtime_error(what+": "+std::strerror(errno));
@@ -81,11 +70,17 @@ void TtcHost::publish(uint64_t triggerTs) {
     mem->published.store(id+1,std::memory_order_release);
 }
 
+/*
+bump wakeSeq, then check if anyone sleeps. client does the mirror image (waiters++ then
+sleep on wakeSeq). store->load on both sides = Dekker, needs a full fence each side or on
+ARM both loads can see the old value -> missed wakeup (x86 hides this, M1 doesnt)
+*/
 void TtcHost::wakeAll() {
-    mem->wakeSeq.fetch_add(1,std::memory_order_release);
+    mem->wakeSeq.fetch_add(1,std::memory_order_seq_cst);
+    std::atomic_thread_fence(std::memory_order_seq_cst);
     //skip the syscall when nobody sleeps
-    if(mem->waiters.load(std::memory_order_acquire)>0){
-        futexWake(&mem->wakeSeq);
+    if(mem->waiters.load(std::memory_order_relaxed)>0){
+        futexWake(&mem->wakeSeq,true);  //shared: sleepers are other processes
     }
 }
 
@@ -175,9 +170,10 @@ TtcClient::Result TtcClient::waitNext(uint64_t& eventId, uint64_t& triggerTs) {
 
         uint32_t w=mem->wakeSeq.load(std::memory_order_acquire);
         if(mem->published.load(std::memory_order_acquire)!=pub) continue;  //raced w/ a publish
-        mem->waiters.fetch_add(1,std::memory_order_acq_rel);
-        futexWait(&mem->wakeSeq,w,2'000'000);
-        mem->waiters.fetch_sub(1,std::memory_order_acq_rel);
+        mem->waiters.fetch_add(1,std::memory_order_seq_cst);
+        std::atomic_thread_fence(std::memory_order_seq_cst);
+        futexWait(&mem->wakeSeq,w,2'000'000,true);
+        mem->waiters.fetch_sub(1,std::memory_order_relaxed);
     }
 } /* TtcClient::waitNext() */
 

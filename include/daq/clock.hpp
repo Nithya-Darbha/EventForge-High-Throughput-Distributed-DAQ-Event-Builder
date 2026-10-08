@@ -38,6 +38,27 @@ inline void tightTimerSlack() {
     prctl(PR_SET_TIMERSLACK,1UL,0,0,0);
 }
 
+inline void cpuRelax() {
+#if defined(__x86_64__)
+    __builtin_ia32_pause();
+#elif defined(__aarch64__)
+    asm volatile("yield");
+#endif
+}
+
+/*
+precise sleep = nanosleep most of the way, spin the last spinNs.
+on a normal linux box short sleeps wake up ~5-60us late so spinNs is small.
+inside some VMs (OrbStack/Docker on a Mac) a 100us sleep can take 2-3 ms, then
+the trigger + sinks would be way off without spinning. calibrateSpin() measures it.
+*/
+uint64_t calibrateSpin();          //measures sleep overshoot, sets + returns spinNs
+void setSpinNs(uint64_t ns);
+uint64_t spinNs();
+uint64_t sleepOvershootNs();       //what calibrateSpin measured (p90)
+void preciseSleepUntil(uint64_t deadline);
+inline void preciseSleep(uint64_t ns) { preciseSleepUntil(nowNs()+ns); }
+
 inline double nsToUs(uint64_t ns) { return static_cast<double>(ns)/1e3; }
 inline double nsToS(uint64_t ns) { return static_cast<double>(ns)/1e9; }
 

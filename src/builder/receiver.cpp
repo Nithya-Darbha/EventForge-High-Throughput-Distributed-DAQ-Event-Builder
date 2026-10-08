@@ -26,6 +26,11 @@ Receiver::Receiver(const BuilderConfig& c, Shared& s, std::vector<std::unique_pt
     ev.events=EPOLLIN;
     ev.data.fd=listenFd;
     epoll_ctl(ep,EPOLL_CTL_ADD,listenFd,&ev);
+    //sinks/shards poke this when credits are ready to go back
+    epoll_event wev{};
+    wev.events=EPOLLIN;
+    wev.data.fd=shared.wakeFd;
+    epoll_ctl(ep,EPOLL_CTL_ADD,shared.wakeFd,&wev);
 }
 
 Receiver::~Receiver() {
@@ -54,6 +59,12 @@ void Receiver::run(const std::atomic<bool>& stop) {
             int fd=evs[static_cast<size_t>(i)].data.fd;
             if(fd==listenFd){
                 accept();
+                continue;
+            }
+            if(fd==shared.wakeFd){
+                uint64_t cnt=0;
+                ssize_t r=read(shared.wakeFd,&cnt,sizeof(cnt));  //just clear it, grantCredits below does the work
+                (void)r;
                 continue;
             }
             auto it=conns.find(fd);
@@ -212,6 +223,7 @@ Receiver::Parse Receiver::handleHello(Conn& c, const std::byte* body, uint32_t l
     c.gen=cr.gen.fetch_add(1,std::memory_order_acq_rel)+1;
     cr.released.store(0,std::memory_order_release);
     c.lastGrant=cfg.credits;
+    cr.wakeAt.store(grantStep,std::memory_order_seq_cst);  //first poke after grantStep releases
     track[src].resetConn();
 
     uint64_t bit=1ull<<src;
@@ -318,18 +330,27 @@ Receiver::Parse Receiver::handleFragment(Conn& c, const std::byte* body, uint32_
 /*
 per connected source: limit = released + credits
 only send when it moved by at least grantStep (credits/8)
+then tell the releasers at which count to poke us next (wakeAt).
+if released already went past that while we were busy -> go again, else that poke is lost
 */
 void Receiver::grantCredits() {
     for(auto& [fd,c]:conns){
         if(c.source<0) continue;
-        uint64_t released=shared.credit[c.source].released.load(std::memory_order_acquire);
-        uint64_t limit=released+cfg.credits;
-        if(limit>=c.lastGrant+grantStep){
-            std::byte b[64];
-            size_t n=encodeSimple(b,MsgType::CREDIT,CreditMsg{limit});
-            queueSend(c,b,n);
-            c.lastGrant=limit;
-            creditMsgs.add();
+        SourceCredit& cr=shared.credit[c.source];
+        while(true){
+            uint64_t released=cr.released.load(std::memory_order_seq_cst);
+            uint64_t limit=released+cfg.credits;
+            if(limit>=c.lastGrant+grantStep){
+                std::byte b[64];
+                size_t n=encodeSimple(b,MsgType::CREDIT,CreditMsg{limit});
+                queueSend(c,b,n);
+                c.lastGrant=limit;
+                creditMsgs.add();
+            }
+            uint64_t next=c.lastGrant+grantStep-cfg.credits;  //released value that allows the next grant
+            cr.wakeAt.store(next,std::memory_order_seq_cst);
+            bool missed=cr.released.load(std::memory_order_seq_cst)>=next;
+            if(!missed) break;
         }
         if(!c.tx.empty()) flushTx(c);
     }

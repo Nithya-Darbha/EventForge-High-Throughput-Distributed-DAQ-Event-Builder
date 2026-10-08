@@ -1,0 +1,19 @@
+{
+  "name": "burst",
+  "runs": [
+    {
+      "label": "policy=block",
+      "params": {
+        "frontend.policy": "block"
+      },
+      "dir": "policy=block"
+    },
+    {
+      "label": "policy=drop",
+      "params": {
+        "frontend.policy": "drop"
+      },
+      "dir": "policy=drop"
+    }
+  ]
+}

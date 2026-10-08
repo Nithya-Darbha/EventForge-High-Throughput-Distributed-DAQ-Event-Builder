@@ -1,0 +1,10 @@
+{
+  "name": "baseline",
+  "runs": [
+    {
+      "label": "default",
+      "params": {},
+      "dir": "default"
+    }
+  ]
+}

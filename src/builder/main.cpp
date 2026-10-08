@@ -24,6 +24,7 @@
 #include "builder/trigger.hpp"
 #include "daq/args.hpp"
 #include "daq/clock.hpp"
+#include "daq/crc32c.hpp"
 #include "daq/metrics.hpp"
 #include "daq/ttc.hpp"
 
@@ -243,6 +244,19 @@ int main(int argc, char** argv) {
     std::signal(SIGPIPE,SIG_IGN);
     tightTimerSlack();
 
+    //how good are short sleeps on this box? decides how much the trigger + sinks spin
+    double spinArg=a.f64("spin-us",-1);
+    if(spinArg>=0){
+        setSpinNs(static_cast<uint64_t>(spinArg*1e3));
+    }
+    else{
+        calibrateSpin();
+    }
+    if(!cfg.quiet || sleepOvershootNs()>500*NS_PER_US){
+        std::fprintf(stderr,"builder: short sleeps wake up %.0f us late (p90) -> spinning the last %.0f us, crc32c=%s\n",
+                     nsToUs(sleepOvershootNs()),nsToUs(spinNs()),crc32cImpl());
+    }
+
     Shared shared(cfg);
     TtcHost ttc(ttcName(cfg.port));
     BoundedQueue<Event> done(cfg.doneCap);
@@ -379,6 +393,9 @@ int main(int argc, char** argv) {
      .add("credit_msgs",recv.creditMsgs.get())
      .add("max_partials",tot.maxPartials)
      .add("cpu_s",processCpuSeconds())
+     .add("crc32c_impl",std::string(crc32cImpl()))
+     .add("sleep_overshoot_us",nsToUs(sleepOvershootNs()))
+     .add("spin_us",nsToUs(spinNs()))
      .raw("thread_cpu_s",threads.str())
      .raw("per_source",perSource);
     std::printf("%s\n",j.str().c_str());

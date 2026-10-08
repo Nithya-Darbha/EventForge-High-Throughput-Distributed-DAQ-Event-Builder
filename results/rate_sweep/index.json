@@ -1,0 +1,61 @@
+{
+  "name": "rate_sweep",
+  "runs": [
+    {
+      "label": "rate=5000",
+      "params": {
+        "builder.rate": 5000
+      },
+      "dir": "rate=5000"
+    },
+    {
+      "label": "rate=10000",
+      "params": {
+        "builder.rate": 10000
+      },
+      "dir": "rate=10000"
+    },
+    {
+      "label": "rate=20000",
+      "params": {
+        "builder.rate": 20000
+      },
+      "dir": "rate=20000"
+    },
+    {
+      "label": "rate=30000",
+      "params": {
+        "builder.rate": 30000
+      },
+      "dir": "rate=30000"
+    },
+    {
+      "label": "rate=40000",
+      "params": {
+        "builder.rate": 40000
+      },
+      "dir": "rate=40000"
+    },
+    {
+      "label": "rate=50000",
+      "params": {
+        "builder.rate": 50000
+      },
+      "dir": "rate=50000"
+    },
+    {
+      "label": "rate=60000",
+      "params": {
+        "builder.rate": 60000
+      },
+      "dir": "rate=60000"
+    },
+    {
+      "label": "rate=80000",
+      "params": {
+        "builder.rate": 80000
+      },
+      "dir": "rate=80000"
+    }
+  ]
+}

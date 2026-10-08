@@ -1,0 +1,19 @@
+{
+  "name": "producer_failure",
+  "runs": [
+    {
+      "label": "degraded=False",
+      "params": {
+        "builder.degraded": false
+      },
+      "dir": "degraded=False"
+    },
+    {
+      "label": "degraded=True",
+      "params": {
+        "builder.degraded": true
+      },
+      "dir": "degraded=True"
+    }
+  ]
+}

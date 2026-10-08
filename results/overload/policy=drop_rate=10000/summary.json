@@ -1,0 +1,113 @@
+{
+  "config": {
+    "sources": 4,
+    "credits": 128,
+    "shards": 2,
+    "sinks": 2,
+    "queue": "spsc",
+    "rate": 10000,
+    "rate_profile": "",
+    "duration_s": 3,
+    "timeout_ms": 100,
+    "degraded": 0,
+    "sink_delay_us": 100
+  },
+  "span_s": 3.00005,
+  "triggers_issued": 30000,
+  "triggers_vetoed": 0,
+  "deadtime_frac": 0,
+  "events_complete": 30000,
+  "events_degraded": 0,
+  "events_incomplete": 0,
+  "events_never_seen": 0,
+  "events_per_s": 9999.85,
+  "mb_per_s": 163.838,
+  "offered_per_s": 10000,
+  "fragments_rx": 120000,
+  "bytes_rx": 498240000,
+  "latency_e2e_us": {
+    "p50": 155.647,
+    "p95": 229.375,
+    "p99": 737.279,
+    "p999": 2555.9,
+    "max": 4174.26,
+    "mean": 177.669
+  },
+  "latency_build_us": {
+    "p50": 0,
+    "p95": 57.343,
+    "p99": 147.455,
+    "p999": 1703.93,
+    "max": 2576.91,
+    "mean": 17.9114
+  },
+  "crc_errors": 0,
+  "duplicates": 0,
+  "late_fragments": 0,
+  "protocol_errors": 0,
+  "producer_failures": 0,
+  "reconnects": 0,
+  "bye_mismatch": 0,
+  "verify_fail": 0,
+  "inbox_full_spins": 0,
+  "pool_empty": 0,
+  "pool_slots": 544,
+  "pool_leaked": 0,
+  "credit_msgs": 7459,
+  "max_partials": 27,
+  "cpu_s": 6.6531,
+  "crc32c_impl": "armv8-crc",
+  "sleep_overshoot_us": 2993.42,
+  "spin_us": 4500.12,
+  "thread_cpu_s": {
+    "eb-recv": 0.43,
+    "eb-sampler": 0,
+    "eb-shard0": 0.1,
+    "eb-shard1": 0.11,
+    "eb-sink0": 1.52,
+    "eb-sink1": 1.51,
+    "eb-trigger": 2.8
+  },
+  "per_source": [
+    {
+      "id": 0,
+      "fragments": 30000,
+      "seq_gaps": 0,
+      "reordered": 0,
+      "net_transit_loss": 0,
+      "duplicates": 0,
+      "source_skips": 0,
+      "missing_in_incomplete": 0
+    },
+    {
+      "id": 1,
+      "fragments": 30000,
+      "seq_gaps": 0,
+      "reordered": 0,
+      "net_transit_loss": 0,
+      "duplicates": 0,
+      "source_skips": 0,
+      "missing_in_incomplete": 0
+    },
+    {
+      "id": 2,
+      "fragments": 30000,
+      "seq_gaps": 0,
+      "reordered": 0,
+      "net_transit_loss": 0,
+      "duplicates": 0,
+      "source_skips": 0,
+      "missing_in_incomplete": 0
+    },
+    {
+      "id": 3,
+      "fragments": 30000,
+      "seq_gaps": 0,
+      "reordered": 0,
+      "net_transit_loss": 0,
+      "duplicates": 0,
+      "source_skips": 0,
+      "missing_in_incomplete": 0
+    }
+  ]
+}

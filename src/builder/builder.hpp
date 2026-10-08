@@ -5,6 +5,9 @@
  *   Shared         - buffer pool, per source credit counters, live source mask
  *   ShardInbox     - receiver -> shard queue (lock free SPSC ring or mutex queue, cmd line switch)
  */
+#include <sys/eventfd.h>
+#include <unistd.h>
+
 #include <atomic>
 #include <cstdint>
 #include <memory>
@@ -56,12 +59,17 @@ struct BuilderConfig {
 struct alignas(64) SourceCredit {
     std::atomic<uint64_t> released{0};  //frags of this source we are done with (this conn)
     std::atomic<uint32_t> gen{0};       //++ on every new conn, old frags dont count for the new one
+    std::atomic<uint64_t> wakeAt{UINT64_MAX};  //released count at which the receiver wants a poke
 };
 
 class Shared {
 public:
     explicit Shared(const BuilderConfig& cfg)
-        : pool(cfg.poolSlots(),cfg.maxPayload), credit(new SourceCredit[cfg.sources]) {}
+        : pool(cfg.poolSlots(),cfg.maxPayload), credit(new SourceCredit[cfg.sources]),
+          wakeFd(eventfd(0,EFD_NONBLOCK|EFD_CLOEXEC)) {}
+    ~Shared() { close(wakeFd); }
+    Shared(const Shared&)=delete;
+    Shared& operator=(const Shared&)=delete;
 
     //done with a frag: payload slot back to the pool + 1 credit back to its source
     void releaseFrag(const Fragment& f) {
@@ -69,16 +77,24 @@ public:
         releaseCredit(f.hdr.sourceId,f.gen);
     }
     //frag that never got a pool slot (dup/crc error), just the credit
+    //exactly when enough came back for the next CREDIT msg, poke the receiver thru the
+    //eventfd. before this, if every frontend was blocked (= no socket traffic) the receiver
+    //only noticed on its 1ms epoll timeout -> credits came back late (worse in a VM)
     void releaseCredit(uint16_t src, uint32_t gen) {
         SourceCredit& c=credit[src];
-        if(c.gen.load(std::memory_order_acquire)==gen){
-            c.released.fetch_add(1,std::memory_order_release);
+        if(c.gen.load(std::memory_order_acquire)!=gen) return;
+        uint64_t r=c.released.fetch_add(1,std::memory_order_seq_cst)+1;
+        if(r==c.wakeAt.load(std::memory_order_seq_cst)){
+            uint64_t one=1;
+            ssize_t n=write(wakeFd,&one,sizeof(one));
+            (void)n;  //EAGAIN = counter already set, receiver wakes anyway
         }
     }
 
     BufferPool pool;
     std::unique_ptr<SourceCredit[]> credit;
     std::atomic<uint64_t> liveMask{0};  //sources currently connected
+    int wakeFd;                         //eventfd, receiver has it in its epoll set
 };
 
 class ShardInbox {
@@ -98,6 +114,10 @@ private:
     std::unique_ptr<SpscRing<Fragment>> ring;
     std::unique_ptr<BoundedQueue<Fragment>> q;
     std::atomic<bool> closed{false};
+    //spsc ring has no condvar: consumer sleeps on a futex, producer bumps pushSeq and
+    //wakes it only if `sleeping` is set (so the fast path is just an increment + a load)
+    alignas(64) std::atomic<uint32_t> pushSeq{0};
+    alignas(64) std::atomic<uint32_t> sleeping{0};
 };
 
 } // namespace daq

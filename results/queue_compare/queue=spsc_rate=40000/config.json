@@ -1,0 +1,26 @@
+{
+  "name": "queue_compare",
+  "builder": {
+    "sources": 4,
+    "duration_s": 3,
+    "credits": 256,
+    "queue": "spsc",
+    "rate": 40000
+  },
+  "frontend": {
+    "payload_min": 1024,
+    "payload_max": 1024,
+    "policy": "block"
+  },
+  "sweep": {
+    "builder.queue": [
+      "spsc",
+      "mutex"
+    ],
+    "builder.rate": [
+      20000,
+      40000,
+      60000
+    ]
+  }
+}

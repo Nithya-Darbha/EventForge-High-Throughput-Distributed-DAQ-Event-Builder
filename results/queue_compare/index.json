@@ -1,0 +1,53 @@
+{
+  "name": "queue_compare",
+  "runs": [
+    {
+      "label": "queue=spsc_rate=20000",
+      "params": {
+        "builder.queue": "spsc",
+        "builder.rate": 20000
+      },
+      "dir": "queue=spsc_rate=20000"
+    },
+    {
+      "label": "queue=spsc_rate=40000",
+      "params": {
+        "builder.queue": "spsc",
+        "builder.rate": 40000
+      },
+      "dir": "queue=spsc_rate=40000"
+    },
+    {
+      "label": "queue=spsc_rate=60000",
+      "params": {
+        "builder.queue": "spsc",
+        "builder.rate": 60000
+      },
+      "dir": "queue=spsc_rate=60000"
+    },
+    {
+      "label": "queue=mutex_rate=20000",
+      "params": {
+        "builder.queue": "mutex",
+        "builder.rate": 20000
+      },
+      "dir": "queue=mutex_rate=20000"
+    },
+    {
+      "label": "queue=mutex_rate=40000",
+      "params": {
+        "builder.queue": "mutex",
+        "builder.rate": 40000
+      },
+      "dir": "queue=mutex_rate=40000"
+    },
+    {
+      "label": "queue=mutex_rate=60000",
+      "params": {
+        "builder.queue": "mutex",
+        "builder.rate": 60000
+      },
+      "dir": "queue=mutex_rate=60000"
+    }
+  ]
+}

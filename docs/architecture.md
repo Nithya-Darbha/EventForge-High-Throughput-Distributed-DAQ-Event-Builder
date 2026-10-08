@@ -130,6 +130,23 @@ being given a seq). `eventId` comes from the trigger. That makes the cases separ
 - **Stuck frontend / consumer slowdown / bursts**: handled by the normal backpressure chain, measured
   by the sampler.
 
+## Wakeups and timing
+
+Nothing on the data path waits on a timer:
+
+| who waits | for what | how |
+|---|---|---|
+| frontend | next trigger | futex on `wakeSeq` in the TTC segment (shared, cross process) |
+| frontend (BLOCK) | credit | `poll()` on its socket |
+| receiver | data / credits ready | epoll on the sockets + an eventfd the sinks write once per credit batch |
+| shard | fragment | SPSC: futex on `pushSeq` (producer wakes only if `sleeping`), mutex queue: condvar |
+| sink | event | condvar of the done queue |
+
+Only the trigger generator and the sink's simulated storage delay are paced by time. They use
+`preciseSleepUntil()`: nanosleep most of the way, spin the last part. How much to spin is
+measured at startup (`calibrateSpin()`), because inside a VM on a Mac a 100 µs sleep can
+take 2-3 ms. The summary reports `sleep_overshoot_us`, `spin_us` and `crc32c_impl`.
+
 ## Metrics (`metrics.jsonl`, one line per sample)
 
 `t`, `trig_rate`, `veto_rate`, `deadtime`, `ev_rate`, `mb_rate`, `frag_rate`, `lat_p50_us`,
