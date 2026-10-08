@@ -54,7 +54,7 @@ it to behave inside the Mac VM took some work, see [NOTES.md](NOTES.md).
 | Baseline (4 sources, 10 kHz, 4 KB) | 50,000 / 50,000 events complete, every payload byte verified, trigger to stored latency p50 **45 µs**, p99 **78 µs** |
 | Builder throughput | **79k events/s, ~1.3 GB/s** of payload at 1.5% deadtime, highest rate tested, not saturated yet |
 | Overload, BLOCK | throughput holds at sink capacity (19.8k/s), **0 incomplete events**, the excess becomes deadtime (34 to 51%) |
-| Overload, DROP | at 1.5 to 2x capacity throughput **collapses to 0.6k to 1.2k events/s**, 96 to 98% of triggers never become a complete event |
+| Overload, DROP | at 1.5 to 2x capacity throughput **collapses to 0.6k to 1.2k events/s**, 97 to 98% of triggers never become a complete event |
 | Bursts to 2x capacity | BLOCK keeps building at full capacity and is back to normal **~90 ms** after each burst. DROP builds almost nothing during each burst |
 | Consumer 10x slower for 1 s | 0 events lost, deadtime ~75% during the slowdown, recovered **~60 ms** after |
 | Producer killed for 1.5 s | normal mode: 3,413 incomplete + 13.8% deadtime. degraded mode: **1 incomplete, 0% deadtime** |
