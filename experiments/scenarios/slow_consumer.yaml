@@ -1,0 +1,17 @@
+# consumer slowdown: sinks get 10x slower for 1s in the middle of the run
+name: slow_consumer
+builder:
+  sources: 4
+  rate: 8000
+  duration_s: 5
+  credits: 128
+  sinks: 2
+  sink_delay_us: 100
+  slow_at_s: 2.0
+  slow_for_s: 1.0
+  slow_delay_us: 1000
+  sample_ms: 50
+frontend:
+  payload_min: 4096
+  payload_max: 4096
+  policy: block

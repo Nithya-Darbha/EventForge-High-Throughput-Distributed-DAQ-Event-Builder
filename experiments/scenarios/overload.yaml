@@ -1,0 +1,17 @@
+# BLOCK vs DROP when the consumer is too slow.
+# sink capacity is pinned with a fake storage delay (2 sinks x 100us) so the
+# overload point doesnt depend on how fast the machine is
+name: overload
+builder:
+  sources: 4
+  duration_s: 3
+  credits: 128
+  sinks: 2
+  sink_delay_us: 100
+  timeout_ms: 100
+frontend:
+  payload_min: 4096
+  payload_max: 4096
+sweep:
+  frontend.policy: [block, drop]
+  builder.rate: [5000, 10000, 15000, 20000, 30000, 40000]

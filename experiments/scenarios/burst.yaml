@@ -1,0 +1,17 @@
+# bursts above capacity (~14k/s with this sink delay) on top of a normal load
+# watch busy/deadtime kick in during the burst and how fast queues drain after
+name: burst
+builder:
+  sources: 4
+  rate: 8000
+  rate_profile: "0:8000,1.0:30000,1.3:8000,2.5:30000,2.8:8000,4.0:30000,4.3:8000"
+  duration_s: 5.5
+  credits: 128
+  sinks: 2
+  sink_delay_us: 100
+  sample_ms: 50
+frontend:
+  payload_min: 4096
+  payload_max: 4096
+sweep:
+  frontend.policy: [block, drop]
